@@ -238,22 +238,49 @@
       return editor.innerText || '';
     }
 
-    function setCaretToEnd(el) {
-      // Only set caret if the editor is focused
-      if (document.activeElement !== el) return;
-      el.focus();
-      if (typeof window.getSelection != "undefined"
-          && typeof document.createRange != "undefined") {
-        var range = document.createRange();
-        range.selectNodeContents(el);
-        range.collapse(false);
-        var sel = window.getSelection();
-        sel.removeAllRanges();
-        sel.addRange(range);
+    function saveCaretPosition(context) {
+      const selection = window.getSelection();
+      if (!selection.rangeCount) return null;
+      const range = selection.getRangeAt(0);
+      const preSelectionRange = range.cloneRange();
+      preSelectionRange.selectNodeContents(context);
+      preSelectionRange.setEnd(range.startContainer, range.startOffset);
+      const start = preSelectionRange.toString().length;
+      return { start, end: start + range.toString().length };
+    }
+
+    function restoreCaretPosition(context, saved) {
+      if (!saved) return;
+      let charIndex = 0, range = document.createRange();
+      range.setStart(context, 0);
+      range.collapse(true);
+      let nodeStack = [context], node, foundStart = false, stop = false;
+      while (!stop && (node = nodeStack.pop())) {
+        if (node.nodeType === 3) {
+          const nextCharIndex = charIndex + node.length;
+          if (!foundStart && saved.start >= charIndex && saved.start <= nextCharIndex) {
+            range.setStart(node, saved.start - charIndex);
+            foundStart = true;
+          }
+          if (foundStart && saved.end >= charIndex && saved.end <= nextCharIndex) {
+            range.setEnd(node, saved.end - charIndex);
+            stop = true;
+          }
+          charIndex = nextCharIndex;
+        } else {
+          let i = node.childNodes.length;
+          while (i--) {
+            nodeStack.push(node.childNodes[i]);
+          }
+        }
       }
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
     }
 
     function updateEditorHighlight() {
+      const saved = saveCaretPosition(editor);
       const text = getPlainTextFromEditor();
       // Split and highlight words
       const html = text.replace(/\b([a-zA-Z']+)\b/g, (match, word) => {
@@ -264,7 +291,7 @@
         return match;
       }).replace(/\n/g, '<br>');
       editor.innerHTML = html;
-      setCaretToEnd(editor);
+      restoreCaretPosition(editor, saved);
     }
 
     editor.addEventListener('input', updateEditorHighlight);
