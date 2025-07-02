@@ -206,6 +206,11 @@
 
     function isAllowed(word) {
       if (allowedWords.has(word)) return true;
+      // Check for irregular verbs
+      if (typeof irregularVerbs !== 'undefined' && irregularVerbs[word] && allowedWords.has(irregularVerbs[word])) return true;
+      // General rule for 'en' and 'n' endings (e.g., eaten -> eat, taken -> take)
+      if (word.endsWith('en') && allowedWords.has(word.slice(0, -2))) return true;
+      if (word.endsWith('n') && allowedWords.has(word.slice(0, -1))) return true;
       // Check for simple plurals
       if (word.endsWith('es') && allowedWords.has(word.slice(0, -2))) return true;
       if (word.endsWith('s') && allowedWords.has(word.slice(0, -1))) return true;
